@@ -1,0 +1,18 @@
+name: autoretroab
+channels:
+  - bioconda
+  - conda-forge
+
+dependencies:
+  - python=3.10
+  - pandas
+  - pyyaml
+  - snakemake
+  - bowtie2
+  - samtools
+  - wget
+  - r-base
+  - bioconductor-deseq2
+  - pip
+  - pip:
+      - telescope

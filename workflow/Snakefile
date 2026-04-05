@@ -1,0 +1,393 @@
+from pathlib import Path
+import pandas as pd
+
+PROJECT_ROOT = Path(workflow.basedir).parent
+SCRIPTS = PROJECT_ROOT / "scripts"
+
+samples_df = pd.read_csv(config["samples_file"], sep="\t")
+SAMPLES = samples_df["sample_id"].unique().tolist()
+OUT = config["output_root"]
+
+rule all:
+    input:
+        f"{OUT}/counts/merged_herv_counts.tsv",
+        f"{OUT}/counts/merged_l1_counts.tsv",
+        f"{OUT}/filtered/filtered_herv_counts.tsv",
+        f"{OUT}/filtered/filtered_l1_counts.tsv",
+        f"{OUT}/de/herv_deseq2_results.csv",
+        f"{OUT}/de/l1_deseq2_results.csv",
+        f"{OUT}/de/top10_herv_up.csv",
+        f"{OUT}/de/top10_herv_down.csv",
+        f"{OUT}/de/top10_l1_up.csv",
+        f"{OUT}/de/top10_l1_down.csv",
+        f"{OUT}/enrichment/herv_family_enrichment.csv",
+        f"{OUT}/enrichment/l1_family_enrichment.csv",
+        f"{OUT}/chromosomal/herv_chromosomal_distribution.csv",
+        f"{OUT}/chromosomal/l1_chromosomal_distribution.csv",
+        f"{OUT}/plots/herv_volcano.png",
+        f"{OUT}/plots/l1_volcano.png",
+        f"{OUT}/reports/summary_report.txt"
+
+rule download_genome_fasta:
+    output:
+        config["genome_fasta"]
+    params:
+        url="https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_44/GRCh38.primary_assembly.genome.fa.gz"
+    shell:
+        r"""
+        mkdir -p $(dirname {output})
+        wget -O {output}.gz {params.url}
+        gunzip -f {output}.gz
+        """
+
+rule build_bowtie2_index:
+    input:
+        fasta=config["genome_fasta"]
+    output:
+        done=config["bowtie2_index"] + ".index.done"
+    params:
+        idx=config["bowtie2_index"]
+    threads: 4
+    shell:
+        r"""
+        mkdir -p $(dirname {params.idx})
+        bowtie2-build --threads {threads} {input.fasta} {params.idx}
+        touch {output}
+        """
+
+rule download_data:
+    input:
+        config["input_json"]
+    output:
+        touch(f"{OUT}/raw/.download_complete")
+    shell:
+        f"""
+        mkdir -p {OUT}/raw
+        python {SCRIPTS}/downloader.py {{input}}
+        touch {{output}}
+        """
+
+rule align_to_bam:
+    input:
+        done=f"{OUT}/raw/.download_complete",
+        samples=config["samples_file"],
+        index_done=config["bowtie2_index"] + ".index.done"
+    output:
+        f"{OUT}/bam/{{sample}}.unsorted.bam"
+    params:
+        rawdir=f"{OUT}/raw",
+        index=config["bowtie2_index"],
+        threads=min(int(config["threads"]), 4)
+    shell:
+        f"""
+        mkdir -p {OUT}/bam
+        CMD=$(python {SCRIPTS}/run_bowtie2_grouped.py \
+          --sample {{wildcards.sample}} \
+          --samples {{input.samples}} \
+          --rawdir {{params.rawdir}} \
+          --index {{params.index}} \
+          --threads {{params.threads}})
+        eval "$CMD" | samtools view -bS - > {{output}}
+        """
+
+rule sort_bam_by_name:
+    input:
+        f"{OUT}/bam/{{sample}}.unsorted.bam"
+    output:
+        f"{OUT}/bam/{{sample}}.name_sorted.bam"
+    shell:
+        """
+        samtools sort -n {input} -o {output}
+        """
+
+rule quantify_herv:
+    input:
+        bam=f"{OUT}/bam/{{sample}}.name_sorted.bam",
+        gtf=config["herv_gtf"]
+    output:
+        f"{OUT}/counts/herv/{{sample}}/telescope-telescope_report.tsv"
+    params:
+        outdir=lambda wc: f"{OUT}/counts/herv/{wc.sample}",
+        telescope=config["telescope_bin"]
+    shell:
+        """
+        mkdir -p {params.outdir}
+        {params.telescope} assign \
+          --attribute locus \
+          --outdir {params.outdir} \
+          {input.bam} \
+          {input.gtf}
+        """
+
+rule quantify_l1:
+    input:
+        bam=f"{OUT}/bam/{{sample}}.name_sorted.bam",
+        gtf=config["l1_gtf"]
+    output:
+        f"{OUT}/counts/l1/{{sample}}/telescope-telescope_report.tsv"
+    params:
+        outdir=lambda wc: f"{OUT}/counts/l1/{wc.sample}",
+        telescope=config["telescope_bin"]
+    shell:
+        """
+        mkdir -p {params.outdir}
+        {params.telescope} assign \
+          --attribute locus \
+          --outdir {params.outdir} \
+          {input.bam} \
+          {input.gtf}
+        """
+
+rule merge_herv_counts:
+    input:
+        expand(f"{OUT}/counts/herv/{{sample}}/telescope-telescope_report.tsv", sample=SAMPLES)
+    output:
+        f"{OUT}/counts/merged_herv_counts.tsv"
+    shell:
+        f"""
+        mkdir -p {OUT}/counts
+        python {SCRIPTS}/merge_telescope_counts.py \
+          {OUT}/counts/herv \
+          {{output}}
+        """
+
+rule merge_l1_counts:
+    input:
+        expand(f"{OUT}/counts/l1/{{sample}}/telescope-telescope_report.tsv", sample=SAMPLES)
+    output:
+        f"{OUT}/counts/merged_l1_counts.tsv"
+    shell:
+        f"""
+        mkdir -p {OUT}/counts
+        python {SCRIPTS}/merge_telescope_counts.py \
+          {OUT}/counts/l1 \
+          {{output}}
+        """
+
+rule filter_herv_counts:
+    input:
+        counts=f"{OUT}/counts/merged_herv_counts.tsv",
+        samples=config["samples_file"],
+        comparison=config["comparison_file"]
+    output:
+        f"{OUT}/filtered/filtered_herv_counts.tsv"
+    params:
+        min_count=config["min_count"]
+    shell:
+        f"""
+        mkdir -p {OUT}/filtered
+        Rscript {SCRIPTS}/filter_counts.R \
+          {{input.counts}} \
+          {{input.samples}} \
+          {{input.comparison}} \
+          {{output}} \
+          {{params.min_count}}
+        """
+
+rule filter_l1_counts:
+    input:
+        counts=f"{OUT}/counts/merged_l1_counts.tsv",
+        samples=config["samples_file"],
+        comparison=config["comparison_file"]
+    output:
+        f"{OUT}/filtered/filtered_l1_counts.tsv"
+    params:
+        min_count=config["min_count"]
+    shell:
+        f"""
+        mkdir -p {OUT}/filtered
+        Rscript {SCRIPTS}/filter_counts.R \
+          {{input.counts}} \
+          {{input.samples}} \
+          {{input.comparison}} \
+          {{output}} \
+          {{params.min_count}}
+        """
+
+rule run_deseq2_herv:
+    input:
+        counts=f"{OUT}/filtered/filtered_herv_counts.tsv",
+        samples=config["samples_file"],
+        comparison=config["comparison_file"]
+    output:
+        csv=f"{OUT}/de/herv_deseq2_results.csv",
+        plot=f"{OUT}/plots/herv_volcano.png"
+    params:
+        alpha=config["alpha"],
+        log2fc=config["log2fc_threshold"]
+    shell:
+        f"""
+        mkdir -p {OUT}/de {OUT}/plots
+        Rscript {SCRIPTS}/run_deseq2_generic.R \
+          {{input.counts}} \
+          {{input.samples}} \
+          {{input.comparison}} \
+          {{output.csv}} \
+          {{output.plot}} \
+          {{params.alpha}} \
+          {{params.log2fc}}
+        """
+
+rule run_deseq2_l1:
+    input:
+        counts=f"{OUT}/filtered/filtered_l1_counts.tsv",
+        samples=config["samples_file"],
+        comparison=config["comparison_file"]
+    output:
+        csv=f"{OUT}/de/l1_deseq2_results.csv",
+        plot=f"{OUT}/plots/l1_volcano.png"
+    params:
+        alpha=config["alpha"],
+        log2fc=config["log2fc_threshold"]
+    shell:
+        f"""
+        mkdir -p {OUT}/de {OUT}/plots
+        Rscript {SCRIPTS}/run_deseq2_generic.R \
+          {{input.counts}} \
+          {{input.samples}} \
+          {{input.comparison}} \
+          {{output.csv}} \
+          {{output.plot}} \
+          {{params.alpha}} \
+          {{params.log2fc}}
+        """
+
+rule extract_herv_top_hits:
+    input:
+        f"{OUT}/de/herv_deseq2_results.csv"
+    output:
+        up=f"{OUT}/de/top10_herv_up.csv",
+        down=f"{OUT}/de/top10_herv_down.csv"
+    params:
+        alpha=config["alpha"],
+        log2fc=config["log2fc_threshold"]
+    shell:
+        f"""
+        Rscript {SCRIPTS}/extract_top_hits.R \
+          {{input}} \
+          {{params.alpha}} \
+          {{params.log2fc}} \
+          {{output.up}} \
+          {{output.down}}
+        """
+
+rule extract_l1_top_hits:
+    input:
+        f"{OUT}/de/l1_deseq2_results.csv"
+    output:
+        up=f"{OUT}/de/top10_l1_up.csv",
+        down=f"{OUT}/de/top10_l1_down.csv"
+    params:
+        alpha=config["alpha"],
+        log2fc=config["log2fc_threshold"]
+    shell:
+        f"""
+        Rscript {SCRIPTS}/extract_top_hits.R \
+          {{input}} \
+          {{params.alpha}} \
+          {{params.log2fc}} \
+          {{output.up}} \
+          {{output.down}}
+        """
+
+rule herv_family_enrichment:
+    input:
+        de=f"{OUT}/de/herv_deseq2_results.csv",
+        meta=config["herv_locus_metadata"]
+    output:
+        f"{OUT}/enrichment/herv_family_enrichment.csv"
+    params:
+        alpha=config["alpha"],
+        log2fc=config["log2fc_threshold"]
+    shell:
+        f"""
+        mkdir -p {OUT}/enrichment
+        Rscript {SCRIPTS}/family_enrichment.R \
+          {{input.de}} \
+          {{input.meta}} \
+          {{output}} \
+          {{params.alpha}} \
+          {{params.log2fc}}
+        """
+
+rule l1_family_enrichment:
+    input:
+        de=f"{OUT}/de/l1_deseq2_results.csv",
+        meta=config["l1_locus_metadata"]
+    output:
+        f"{OUT}/enrichment/l1_family_enrichment.csv"
+    params:
+        alpha=config["alpha"],
+        log2fc=config["log2fc_threshold"]
+    shell:
+        f"""
+        mkdir -p {OUT}/enrichment
+        Rscript {SCRIPTS}/family_enrichment.R \
+          {{input.de}} \
+          {{input.meta}} \
+          {{output}} \
+          {{params.alpha}} \
+          {{params.log2fc}}
+        """
+
+rule herv_chromosomal_distribution:
+    input:
+        de=f"{OUT}/de/herv_deseq2_results.csv",
+        meta=config["herv_locus_metadata"]
+    output:
+        f"{OUT}/chromosomal/herv_chromosomal_distribution.csv"
+    params:
+        alpha=config["alpha"],
+        log2fc=config["log2fc_threshold"]
+    shell:
+        f"""
+        mkdir -p {OUT}/chromosomal
+        Rscript {SCRIPTS}/chromosomal_distribution.R \
+          {{input.de}} \
+          {{input.meta}} \
+          {{output}} \
+          {{params.alpha}} \
+          {{params.log2fc}}
+        """
+
+rule l1_chromosomal_distribution:
+    input:
+        de=f"{OUT}/de/l1_deseq2_results.csv",
+        meta=config["l1_locus_metadata"]
+    output:
+        f"{OUT}/chromosomal/l1_chromosomal_distribution.csv"
+    params:
+        alpha=config["alpha"],
+        log2fc=config["log2fc_threshold"]
+    shell:
+        f"""
+        mkdir -p {OUT}/chromosomal
+        Rscript {SCRIPTS}/chromosomal_distribution.R \
+          {{input.de}} \
+          {{input.meta}} \
+          {{output}} \
+          {{params.alpha}} \
+          {{params.log2fc}}
+        """
+
+rule make_report:
+    input:
+        f"{OUT}/de/herv_deseq2_results.csv",
+        f"{OUT}/de/l1_deseq2_results.csv",
+        f"{OUT}/de/top10_herv_up.csv",
+        f"{OUT}/de/top10_herv_down.csv",
+        f"{OUT}/de/top10_l1_up.csv",
+        f"{OUT}/de/top10_l1_down.csv",
+        f"{OUT}/enrichment/herv_family_enrichment.csv",
+        f"{OUT}/enrichment/l1_family_enrichment.csv",
+        f"{OUT}/chromosomal/herv_chromosomal_distribution.csv",
+        f"{OUT}/chromosomal/l1_chromosomal_distribution.csv",
+        f"{OUT}/plots/herv_volcano.png",
+        f"{OUT}/plots/l1_volcano.png"
+    output:
+        f"{OUT}/reports/summary_report.txt"
+    shell:
+        f"""
+        mkdir -p {OUT}/reports
+        Rscript {SCRIPTS}/make_report.R {{output}}
+        """

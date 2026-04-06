@@ -8,6 +8,18 @@ samples_df = pd.read_csv(config["samples_file"], sep="\t")
 SAMPLES = samples_df["sample_id"].unique().tolist()
 OUT = config["output_root"]
 
+GENOME_FASTA = config["genome_fasta"]
+BOWTIE2_PREFIX = config["bowtie2_index"]
+
+BOWTIE2_INDEX_FILES = [
+    BOWTIE2_PREFIX + ".1.bt2",
+    BOWTIE2_PREFIX + ".2.bt2",
+    BOWTIE2_PREFIX + ".3.bt2",
+    BOWTIE2_PREFIX + ".4.bt2",
+    BOWTIE2_PREFIX + ".rev.1.bt2",
+    BOWTIE2_PREFIX + ".rev.2.bt2",
+]
+
 rule all:
     input:
         f"{OUT}/counts/merged_herv_counts.tsv",
@@ -30,29 +42,30 @@ rule all:
 
 rule download_genome_fasta:
     output:
-        config["genome_fasta"]
+        GENOME_FASTA
     params:
-        url="https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_44/GRCh38.primary_assembly.genome.fa.gz"
+        url="https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_49/GRCh38.primary_assembly.genome.fa.gz"
     shell:
         r"""
         mkdir -p $(dirname {output})
-        wget -O {output}.gz {params.url}
-        gunzip -f {output}.gz
+        if [ ! -f {output} ]; then
+            wget -O {output}.gz {params.url}
+            gunzip -f {output}.gz
+        fi
         """
 
 rule build_bowtie2_index:
     input:
-        fasta=config["genome_fasta"]
+        fasta=GENOME_FASTA
     output:
-        done=config["bowtie2_index"] + ".index.done"
+        BOWTIE2_INDEX_FILES
     params:
-        idx=config["bowtie2_index"]
+        idx=BOWTIE2_PREFIX
     threads: 4
     shell:
         r"""
         mkdir -p $(dirname {params.idx})
         bowtie2-build --threads {threads} {input.fasta} {params.idx}
-        touch {output}
         """
 
 rule download_data:
@@ -71,13 +84,18 @@ rule align_to_bam:
     input:
         done=f"{OUT}/raw/.download_complete",
         samples=config["samples_file"],
-        index_done=config["bowtie2_index"] + ".index.done"
+        idx1=BOWTIE2_PREFIX + ".1.bt2",
+        idx2=BOWTIE2_PREFIX + ".2.bt2",
+        idx3=BOWTIE2_PREFIX + ".3.bt2",
+        idx4=BOWTIE2_PREFIX + ".4.bt2",
+        idx5=BOWTIE2_PREFIX + ".rev.1.bt2",
+        idx6=BOWTIE2_PREFIX + ".rev.2.bt2"
     output:
         f"{OUT}/bam/{{sample}}.unsorted.bam"
     params:
         rawdir=f"{OUT}/raw",
-        index=config["bowtie2_index"],
-        threads=min(int(config["threads"]), 4)
+        index=BOWTIE2_PREFIX,
+        threads=lambda wc: min(int(config["threads"]), 4)
     shell:
         f"""
         mkdir -p {OUT}/bam

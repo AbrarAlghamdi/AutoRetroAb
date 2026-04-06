@@ -1,10 +1,12 @@
 name: autoretroab
 channels:
-  - bioconda
   - conda-forge
+  - bioconda
+  - defaults
 
 dependencies:
   - python=3.10
+  - numpy<2
   - pandas
   - pyyaml
   - snakemake
@@ -13,6 +15,5 @@ dependencies:
   - wget
   - r-base
   - bioconductor-deseq2
+  - telescope
   - pip
-  - pip:
-      - telescope

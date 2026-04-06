@@ -47,9 +47,7 @@ autoretroab --help
 
 ---
 
-## Usage
 
-```md
 ## Usage
 
 ### Create a job from a CSV file

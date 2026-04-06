@@ -10,9 +10,10 @@ dependencies:
   - pandas
   - pyyaml
   - snakemake
+  - stopit
   - bowtie2
   - samtools
-  - sra-tools
+  - sra-tools=3.2.1
   - wget
   - r-base
   - bioconductor-deseq2

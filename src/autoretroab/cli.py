@@ -1,13 +1,30 @@
+
 import argparse
 import csv
 import json
 import os
+import shutil
 import subprocess
 import sys
+import urllib.request
+import gzip
+
+
+GENCODE_PRIMARY_FASTA_URL = (
+    "https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_49/"
+    "GRCh38.primary_assembly.genome.fa.gz"
+)
 
 
 def get_project_root():
     return os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+
+
+def run_command(cmd):
+    print("Running:", " ".join(cmd))
+    result = subprocess.run(cmd)
+    if result.returncode != 0:
+        sys.exit(result.returncode)
 
 
 def run_pipeline(config: str, cores: str, rerun_incomplete: bool = False):
@@ -67,6 +84,60 @@ def load_samples_from_csv(csv_path):
                 }
             )
     return rows
+
+
+def ensure_dir(path):
+    os.makedirs(path, exist_ok=True)
+
+
+def download_file(url, out_path):
+    print(f"Downloading {url}")
+    urllib.request.urlretrieve(url, out_path)
+    print(f"Saved to {out_path}")
+
+
+def gunzip_file(gz_path, out_path):
+    print(f"Decompressing {gz_path}")
+    with gzip.open(gz_path, "rb") as fin, open(out_path, "wb") as fout:
+        shutil.copyfileobj(fin, fout)
+    print(f"Wrote {out_path}")
+
+
+def setup_reference():
+    project_root = get_project_root()
+    ref_dir = os.path.join(project_root, "resources", "reference")
+    bt2_dir = os.path.join(ref_dir, "hg38_bt2")
+    fasta_path = os.path.join(ref_dir, "hg38.primary_assembly.fa")
+    gz_path = fasta_path + ".gz"
+    bt2_prefix = os.path.join(bt2_dir, "hg38")
+
+    ensure_dir(ref_dir)
+    ensure_dir(bt2_dir)
+
+    if not os.path.exists(fasta_path):
+        if not os.path.exists(gz_path):
+            download_file(GENCODE_PRIMARY_FASTA_URL, gz_path)
+        gunzip_file(gz_path, fasta_path)
+    else:
+        print(f"Found FASTA: {fasta_path}")
+
+    expected_index_files = [
+        bt2_prefix + ".1.bt2",
+        bt2_prefix + ".2.bt2",
+        bt2_prefix + ".3.bt2",
+        bt2_prefix + ".4.bt2",
+        bt2_prefix + ".rev.1.bt2",
+        bt2_prefix + ".rev.2.bt2",
+    ]
+
+    if all(os.path.exists(p) for p in expected_index_files):
+        print("Bowtie2 index already exists.")
+    else:
+        run_command(["bowtie2-build", fasta_path, bt2_prefix])
+
+    print("Reference setup complete.")
+    print(f"FASTA: {fasta_path}")
+    print(f"Bowtie2 index prefix: {bt2_prefix}")
 
 
 def write_job_files(job_name: str, group1: str, group2: str, rows):
@@ -200,6 +271,8 @@ def main():
     init = sub.add_parser("init-csv", help="Create a template CSV file")
     init.add_argument("path")
 
+    setup = sub.add_parser("setup-reference", help="Download hg38 FASTA and build Bowtie2 index")
+
     args = parser.parse_args()
 
     if args.command == "run":
@@ -210,6 +283,8 @@ def main():
         create_job_from_csv(args.name, args.group1, args.group2, args.csv)
     elif args.command == "init-csv":
         init_csv(args.path)
+    elif args.command == "setup-reference":
+        setup_reference()
     else:
         parser.print_help()
 

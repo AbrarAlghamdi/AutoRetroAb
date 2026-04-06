@@ -37,7 +37,10 @@ def main():
 
     required = {"sample_id", "run_id", "condition"}
     if not required.issubset(set(df.columns)):
-        print(f"Missing required columns in samples file. Found: {list(df.columns)}", file=sys.stderr)
+        print(
+            f"Missing required columns in samples file. Found: {list(df.columns)}",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     df["sample_id"] = df["sample_id"].astype(str).str.strip()
@@ -55,24 +58,29 @@ def main():
     result = find_fastq_files(args.rawdir, run_id)
     if result is None:
         print(f"Missing FASTQ for run: {run_id}", file=sys.stderr)
-        print(f"Checked in: {os.path.join(os.path.abspath(args.rawdir), run_id)}", file=sys.stderr)
+        print(
+            f"Checked in: {os.path.join(os.path.abspath(args.rawdir), run_id)}",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     index = os.path.abspath(str(args.index).strip())
+
+    common_flags = f'-p {args.threads} -k 100 --very-sensitive'
 
     if result[0] == "paired":
         _, fq1, fq2 = result
         cmd = (
             f'bowtie2 -x "{index}" '
             f'-1 "{fq1}" -2 "{fq2}" '
-            f'-p {args.threads}'
+            f'{common_flags}'
         )
     else:
         _, fq = result
         cmd = (
             f'bowtie2 -x "{index}" '
             f'-U "{fq}" '
-            f'-p {args.threads}'
+            f'{common_flags}'
         )
 
     print(cmd)

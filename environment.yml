@@ -12,6 +12,7 @@ dependencies:
   - snakemake
   - bowtie2
   - samtools
+  - sra-tools
   - wget
   - r-base
   - bioconductor-deseq2

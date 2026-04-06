@@ -1,0 +1,10 @@
+README.md
+pyproject.toml
+src/autoretroab/__init__.py
+src/autoretroab/cli.py
+src/autoretroab.egg-info/PKG-INFO
+src/autoretroab.egg-info/SOURCES.txt
+src/autoretroab.egg-info/dependency_links.txt
+src/autoretroab.egg-info/entry_points.txt
+src/autoretroab.egg-info/requires.txt
+src/autoretroab.egg-info/top_level.txt

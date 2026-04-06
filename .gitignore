@@ -1,18 +1,24 @@
-.snakemake/
-results/
-jobs/
-resources/reference/
 __pycache__/
 *.pyc
 *.pyo
-*.egg-info/
-build/
-dist/
+*.log
+*.out
+*.err
+.snakemake/
+results/
+jobs/
 *.bam
 *.sam
 *.fastq
 *.fastq.gz
-*.fq
 *.fq.gz
+*.gz
+
+# Bowtie2 index / reference large files
+resources/reference/
 *.bt2
-*.bai
+*.bt2l
+
+# OS / editor
+.DS_Store
+*~

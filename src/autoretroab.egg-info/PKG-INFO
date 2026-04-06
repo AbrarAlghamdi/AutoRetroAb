@@ -1,3 +1,12 @@
+Metadata-Version: 2.4
+Name: autoretroab
+Version: 0.1.0
+Summary: Automated retrotransposon RNA-seq pipeline for HERV and LINE-1
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: pandas
+Requires-Dist: pyyaml
+
 # AutoRetroAb
 
 Automated RNA-seq pipeline for retrotransposon analysis from public RNA-seq data, with support for HERV and LINE-1 locus-level quantification.

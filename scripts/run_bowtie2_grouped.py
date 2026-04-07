@@ -8,17 +8,28 @@ def find_fastq_files(rawdir: str, run_id: str):
     rawdir = os.path.abspath(str(rawdir).strip())
     run_id = str(run_id).strip()
 
+    # 1) inside run-specific folder
     run_dir = os.path.join(rawdir, run_id)
+    paired_1_sub = os.path.join(run_dir, f"{run_id}_1.fastq.gz")
+    paired_2_sub = os.path.join(run_dir, f"{run_id}_2.fastq.gz")
+    single_sub = os.path.join(run_dir, f"{run_id}.fastq.gz")
 
-    paired_1 = os.path.join(run_dir, f"{run_id}_1.fastq.gz")
-    paired_2 = os.path.join(run_dir, f"{run_id}_2.fastq.gz")
-    single = os.path.join(run_dir, f"{run_id}.fastq.gz")
+    # 2) directly under rawdir
+    paired_1_flat = os.path.join(rawdir, f"{run_id}_1.fastq.gz")
+    paired_2_flat = os.path.join(rawdir, f"{run_id}_2.fastq.gz")
+    single_flat = os.path.join(rawdir, f"{run_id}.fastq.gz")
 
-    if os.path.exists(paired_1) and os.path.exists(paired_2):
-        return ("paired", paired_1, paired_2)
+    if os.path.exists(paired_1_sub) and os.path.exists(paired_2_sub):
+        return ("paired", paired_1_sub, paired_2_sub)
 
-    if os.path.exists(single):
-        return ("single", single)
+    if os.path.exists(single_sub):
+        return ("single", single_sub)
+
+    if os.path.exists(paired_1_flat) and os.path.exists(paired_2_flat):
+        return ("paired", paired_1_flat, paired_2_flat)
+
+    if os.path.exists(single_flat):
+        return ("single", single_flat)
 
     return None
 
@@ -58,14 +69,10 @@ def main():
     result = find_fastq_files(args.rawdir, run_id)
     if result is None:
         print(f"Missing FASTQ for run: {run_id}", file=sys.stderr)
-        print(
-            f"Checked in: {os.path.join(os.path.abspath(args.rawdir), run_id)}",
-            file=sys.stderr,
-        )
+        print(f"Checked in rawdir: {os.path.abspath(args.rawdir)}", file=sys.stderr)
         sys.exit(1)
 
     index = os.path.abspath(str(args.index).strip())
-
     common_flags = f'-p {args.threads} -k 100 --very-sensitive'
 
     if result[0] == "paired":

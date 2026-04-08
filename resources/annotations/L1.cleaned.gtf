@@ -13543,4 +13543,3 @@ chrY	l1base	exon	9395847	9405994	0	+	.	gene_id "L1FLnI_Yp11.2pb_chrY_9395847_940
 chrY	l1base	exon	9736420	9746020	0	-	.	gene_id "L1FLnI_Yp11.2qb_chrY_9736420_9746020"; transcript_id "L1FLnI_Yp11.2qb_chrY_9736420_9746020"; locus "L1FLnI_Yp11.2qb"; category "L1FLnI"; exon_e "0"; exon_s "1"; l1base_id "UID-9884";
 chrY	l1base	exon	9784594	9794717	0	+	.	gene_id "L1FLnI_Yp11.2rb_chrY_9784594_9794717"; transcript_id "L1FLnI_Yp11.2rb_chrY_9784594_9794717"; locus "L1FLnI_Yp11.2rb"; category "L1FLnI"; exon_e "9785422"; exon_s "9785288"; l1base_id "UID-9825";
 chrY	l1base	exon	9842050	9852257	0	-	.	gene_id "L1FLnI_Yp11.2sb_chrY_9842050_9852257"; transcript_id "L1FLnI_Yp11.2sb_chrY_9842050_9852257"; locus "L1FLnI_Yp11.2sb"; category "L1FLnI"; exon_e "9847832"; exon_s "9843334"; l1base_id "UID-10000";
-

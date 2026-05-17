@@ -132,8 +132,8 @@ autoretroab run --config jobs/myjob/config.yaml --cores 4
 The pipeline performs:
 
 1. Download RNA-seq FASTQ files from SRA
-2. Download the hg38 genome (if missing)
-3. Build Bowtie2 index (if missing)
+2. Download the hg38 genome 
+3. Build Bowtie2 index 
 4. Align reads to the genome
 5. Quantify HERV and LINE-1 loci using Telescope
 6. Merge locus-level counts
@@ -251,18 +251,7 @@ treat_1,treated,SRR2584865
 treat_2,treated,SRR2584866
 ```
 
----
 
-## Supported Platforms
-
-Recommended:
-
-* Linux (Ubuntu or similar)
-* Windows via WSL2
-
-Possible:
-
-* macOS (not fully tested)
 
 ---
 

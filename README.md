@@ -10,7 +10,7 @@ The pipeline enables reproducible analysis of public RNA-seq datasets, from raw 
 
 * Create analysis jobs from **SRR IDs** or **CSV input**
 * Automatically download RNA-seq data from SRA
-* Automatically download the **hg38 reference genome** (if missing)
+* Automatically download the **hg38 reference genome** 
 * Automatically build **Bowtie2 index**
 * Align reads to hg38
 * Quantify retrotransposon loci using Telescope

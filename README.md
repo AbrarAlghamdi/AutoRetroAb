@@ -272,6 +272,12 @@ treat_2,treated,SRR2584866
 * Telescope
 
 (All handled automatically via `environment.yml`)
+## Resuming a Failed Run
+
+If the pipeline stops for any reason, fix the underlying issue and rerun the same command:
+
+```bash
+autoretroab run --config jobs/myjob/config.yaml --cores 4
 
 ---
 

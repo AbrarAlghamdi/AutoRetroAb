@@ -22,3 +22,5 @@ resources/reference/
 # OS / editor
 .DS_Store
 *~
+fasterq.tmp*/
+fasterq.tmp*/

@@ -1,0 +1,5 @@
+sample_id,condition,run_id,r1,r2
+ctrl_1,control,SRR2584863,,
+ctrl_2,control,SRR2584864,,
+treat_1,treated,,/path/to/treat_1_R1.fastq.gz,/path/to/treat_1_R2.fastq.gz
+treat_2,treated,,/path/to/treat_2_R1.fastq.gz,/path/to/treat_2_R2.fastq.gz

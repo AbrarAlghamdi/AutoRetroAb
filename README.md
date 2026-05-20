@@ -127,6 +127,21 @@ autoretroab run --config jobs/myjob/config.yaml --cores 4
 
 ---
 
+###  Use local FASTQ files
+```bash
+sample_id,condition,r1,r2
+ctrl_1,control,/path/to/ctrl_1_R1.fastq.gz,/path/to/ctrl_1_R2.fastq.gz
+ctrl_2,control,/path/to/ctrl_2_R1.fastq.gz,/path/to/ctrl_2_R2.fastq.gz
+treat_1,treated,/path/to/treat_1_R1.fastq.gz,/path/to/treat_1_R2.fastq.gz
+treat_2,treated,/path/to/treat_2_R1.fastq.gz,/path/to/treat_2_R2.fastq.gz
+autoretroab run --config jobs/myjob/config.yaml --cores 4
+```
+
+
+
+
+
+
 ##  What happens automatically
 
 The pipeline performs:

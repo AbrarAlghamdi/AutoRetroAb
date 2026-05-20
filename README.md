@@ -279,15 +279,15 @@ If the pipeline stops for any reason, fix the underlying issue and rerun the sam
 
 ```bash
 autoretroab run --config jobs/myjob/config.yaml --cores 4
-
+```
 ---
 
----
+
 
 ## Abrar Alghamdi
 PhD in Bioinformatics
 University of Leicester
 
-
+---
 
 

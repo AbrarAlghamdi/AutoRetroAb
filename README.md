@@ -296,6 +296,18 @@ If the pipeline stops for any reason, fix the underlying issue and rerun the sam
 autoretroab run --config jobs/myjob/config.yaml --cores 4
 ```
 ---
+### Sequence Similarity Quality Control
+
+AutoRetroAb includes a sequence similarity warning module to identify HERV loci that may be difficult to distinguish due to extensive sequence conservation.
+
+A genome-wide BLAST analysis was performed across all annotated HERV loci. Loci were flagged when they exhibited:
+
+* ≥99% sequence identity
+* Alignment length ≥1000 bp
+
+A total of 488 loci met these criteria and are included in the AutoRetroAb quality-control database.
+
+When flagged loci are detected in downstream analyses, users should interpret locus-level expression estimates with additional caution because highly similar loci may increase read assignment uncertainty.
 
 
 

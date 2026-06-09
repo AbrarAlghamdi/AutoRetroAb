@@ -1,3 +1,10 @@
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://autoretroab.streamlit.app)
+
+## 🌐 Web Interface
+A web interface is available at: **https://autoretroab.streamlit.app**
+
+
+
 # AutoRetroAb
 
 **AutoRetroAb** is an automated RNA-seq pipeline for retrotransposon transcriptomics, focusing on **HERV (Human Endogenous Retroviruses)** and **LINE-1 (L1)** locus-level quantification.

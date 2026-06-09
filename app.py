@@ -1,9 +1,6 @@
 import streamlit as st
 import pandas as pd
-import subprocess
 import os
-import tempfile
-import shutil
 from pathlib import Path
 
 # ── PAGE CONFIG ──────────────────────────────────────────────────────────────
@@ -53,19 +50,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ── HEADER ────────────────────────────────────────────────────────────────────
-st.markdown("""
-<div class="main-header">
-    <h1>🧬 AutoRetroAb</h1>
-    <p style="font-size: 1.1rem; margin: 0;">
-        Automated Locus-Specific Retrotransposon Transcriptomics Pipeline
-    </p>
-    <p style="font-size: 0.9rem; margin-top: 0.5rem; opacity: 0.85;">
-        HERV and LINE-1 differential expression analysis from bulk RNA-seq data
-        · University of Leicester · Abrar Alghamdi
-    </p>
-</div>
-""", unsafe_allow_html=True)
+
 
 # ── SIDEBAR ───────────────────────────────────────────────────────────────────
 with st.sidebar:

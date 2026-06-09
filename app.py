@@ -184,14 +184,7 @@ with tab1:
     # ── STEP 4 ──
     st.markdown("### Step 4 — Run the pipeline")
 
-    st.markdown("""
-    <div class="warning-box">
-    <strong>⚠️ Important:</strong> AutoRetroAb requires Linux or macOS with the conda
-    environment installed. This web interface generates your job configuration and the
-    command to run locally. For full cloud execution, use the Docker image.
-    </div>
-    """, unsafe_allow_html=True)
-    st.markdown("")
+ 
 
     if df is not None and job_name:
         # Generate the command

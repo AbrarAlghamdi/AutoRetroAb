@@ -53,7 +53,6 @@ with st.sidebar:
     st.markdown("### 📚 Resources")
     st.markdown("[📖 GitHub Repository](https://github.com/AbrarAlghamdi/AutoRetroAb)")
     st.markdown("[📄 Documentation](https://github.com/AbrarAlghamdi/AutoRetroAb#readme)")
-    st.markdown("[🐳 Docker Image](https://hub.docker.com/r/abraralghamdi/autoretroab)")
     st.divider()
     st.markdown("### ℹ️ About")
     st.markdown("""

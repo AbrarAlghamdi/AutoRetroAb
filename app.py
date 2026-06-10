@@ -43,6 +43,14 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# ── FIXED DEFAULT PARAMETERS ──────────────────────────────────────────────────
+# To change these, edit this section directly in app.py
+LOG2FC = 1.0
+FDR = 0.05
+MIN_COUNTS = 10
+K_VALUE = 100
+TOP_HITS = 10
+
 # ── SIDEBAR ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("## 🔬 AutoRetroAb")
@@ -65,6 +73,17 @@ AutoRetroAb integrates nine analytical steps into a single reproducible workflow
 - TE family enrichment analysis
 - Volcano plots and reports
     """)
+    st.divider()
+    st.markdown("### ⚙️ Default Parameters")
+    st.markdown(f"""
+| Parameter | Value |
+|-----------|-------|
+| Log2FC threshold | {LOG2FC} |
+| FDR threshold | {FDR} |
+| Min count filter | {MIN_COUNTS} |
+| Bowtie2 -k | {K_VALUE} |
+| Top hits reported | {TOP_HITS} |
+    """)
 
 # ── HEADER ────────────────────────────────────────────────────────────────────
 st.markdown("""
@@ -81,133 +100,11 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ── MAIN TABS ─────────────────────────────────────────────────────────────────
-tab1, tab2, tab3, tab4 = st.tabs([
+tab1, tab2, tab3 = st.tabs([
     "🚀 Run Pipeline",
     "📋 Input Format",
-    "⚙️ Advanced Parameters",
     "📊 Example Results"
 ])
-
-# ── SHARED STATE — parameters defined here so available in all tabs ───────────
-# These are defined outside tabs so Tab 1 can use values set in Tab 3
-if "log2fc" not in st.session_state:
-    st.session_state.log2fc = 1.0
-if "fdr" not in st.session_state:
-    st.session_state.fdr = 0.05
-if "min_counts" not in st.session_state:
-    st.session_state.min_counts = 10
-if "k_value" not in st.session_state:
-    st.session_state.k_value = 100
-if "proximity_window" not in st.session_state:
-    st.session_state.proximity_window = 10000
-if "top_hits" not in st.session_state:
-    st.session_state.top_hits = 10
-
-# ════════════════════════════════════════════════════════════════════════════
-# TAB 3 — ADVANCED PARAMETERS (defined before Tab 1 so values are available)
-# ════════════════════════════════════════════════════════════════════════════
-with tab3:
-    st.markdown("## ⚙️ Advanced Parameters")
-    st.markdown("""
-    <div class="step-box">
-    AutoRetroAb uses validated default parameters. Most users do not need to change
-    anything. Advanced users can customise parameters below — changes are automatically
-    reflected in the commands generated in the Run Pipeline tab.
-    </div>
-    """, unsafe_allow_html=True)
-    st.markdown("")
-
-    col_p1, col_p2 = st.columns(2)
-
-    with col_p1:
-        st.markdown("### Differential Expression")
-        log2fc = st.slider(
-            "Log2 fold change threshold",
-            min_value=0.5, max_value=3.0,
-            value=st.session_state.log2fc, step=0.1,
-            help="Minimum absolute log2 fold change for significance. Default 1.0 = twofold change. Increase for stricter results."
-        )
-        st.session_state.log2fc = log2fc
-
-        fdr = st.select_slider(
-            "FDR threshold",
-            options=[0.01, 0.05, 0.10],
-            value=st.session_state.fdr,
-            help="Benjamini-Hochberg adjusted p-value threshold. Standard value is 0.05."
-        )
-        st.session_state.fdr = fdr
-
-        min_counts = st.slider(
-            "Minimum read count filter",
-            min_value=1, max_value=50,
-            value=st.session_state.min_counts, step=1,
-            help="Minimum Telescope final counts to include a locus in analysis. Lower for small datasets."
-        )
-        st.session_state.min_counts = min_counts
-
-    with col_p2:
-        st.markdown("### Alignment and Reporting")
-        k_value = st.select_slider(
-            "Bowtie2 -k parameter",
-            options=[100, 200, 300],
-            value=st.session_state.k_value,
-            help="Maximum alignments per read. 100 is validated and recommended by Telescope developers."
-        )
-        st.session_state.k_value = k_value
-
-        proximity_window = st.select_slider(
-            "Nearest gene proximity window (bp)",
-            options=[5000, 10000, 25000, 50000],
-            value=st.session_state.proximity_window,
-            help="Window size in base pairs for nearest gene mapping. Default 10,000 bp."
-        )
-        st.session_state.proximity_window = proximity_window
-
-        top_hits = st.slider(
-            "Top DE loci to report",
-            min_value=5, max_value=50,
-            value=st.session_state.top_hits, step=5,
-            help="Number of top up and downregulated loci shown in summary report."
-        )
-        st.session_state.top_hits = top_hits
-
-    st.divider()
-    st.markdown("### Current parameter summary")
-
-    params_df = pd.DataFrame({
-        "Parameter": [
-            "Log2 fold change threshold",
-            "FDR threshold",
-            "Minimum count filter",
-            "Bowtie2 -k value",
-            "Proximity window",
-            "Top hits reported"
-        ],
-        "Your value": [
-            log2fc, fdr, min_counts,
-            k_value, f"{proximity_window:,} bp", top_hits
-        ],
-        "Default": [1.0, 0.05, 10, 100, "10,000 bp", 10],
-        "Status": [
-            "✅ Default" if log2fc == 1.0 else "⚙️ Modified",
-            "✅ Default" if fdr == 0.05 else "⚙️ Modified",
-            "✅ Default" if min_counts == 10 else "⚙️ Modified",
-            "✅ Default" if k_value == 100 else "⚙️ Modified",
-            "✅ Default" if proximity_window == 10000 else "⚙️ Modified",
-            "✅ Default" if top_hits == 10 else "⚙️ Modified",
-        ]
-    })
-    st.dataframe(params_df, hide_index=True, use_container_width=True)
-
-    # Check if any parameters are modified
-    any_modified = any([
-        log2fc != 1.0, fdr != 0.05, min_counts != 10,
-        k_value != 100, proximity_window != 10000, top_hits != 10
-    ])
-    if any_modified:
-        st.info("⚙️ You have modified parameters. Go to the **Run Pipeline** tab to see the updated commands.")
-    else:
-        st.success("✅ All parameters are at their validated defaults.")
 
 # ════════════════════════════════════════════════════════════════════════════
 # TAB 1 — RUN PIPELINE
@@ -218,7 +115,7 @@ with tab1:
     <div class="step-box">
     Follow the steps below. The pipeline will automatically download your RNA-seq data,
     align reads, quantify HERV and LINE-1 expression, and produce a complete differential
-    expression analysis.
+    expression analysis using validated default parameters.
     </div>
     """, unsafe_allow_html=True)
     st.markdown("")
@@ -305,7 +202,6 @@ with tab1:
         help="HERV and LINE-1 analyses run separately using their respective annotation files"
     )
 
-    # Map analysis type to pipeline flag
     analysis_flag_map = {
         "HERV and LINE-1 (recommended)": "--analysis both",
         "HERV only": "--analysis herv",
@@ -313,7 +209,6 @@ with tab1:
     }
     analysis_flag = analysis_flag_map[analysis_type]
 
-    # Show what will be analysed
     if analysis_type == "HERV and LINE-1 (recommended)":
         st.success("✅ Both HERV (14,968 loci, 60 families) and LINE-1 loci will be analysed")
     elif analysis_type == "HERV only":
@@ -326,25 +221,6 @@ with tab1:
     # ── STEP 4 ──
     st.markdown("### Step 4 — Run the pipeline")
 
-    # Show parameter summary if any are modified
-    any_modified = any([
-        st.session_state.log2fc != 1.0,
-        st.session_state.fdr != 0.05,
-        st.session_state.min_counts != 10,
-        st.session_state.k_value != 100,
-        st.session_state.proximity_window != 10000,
-        st.session_state.top_hits != 10
-    ])
-
-    if any_modified:
-        st.markdown("""
-        <div class="info-box">
-        ⚙️ <strong>Custom parameters detected</strong> — your modified parameter values
-        are included in the commands below.
-        </div>
-        """, unsafe_allow_html=True)
-        st.markdown("")
-
     if df is not None and job_name:
 
         # Build create-job command
@@ -356,22 +232,7 @@ with tab1:
             f"  {analysis_flag}"
         ]
 
-        # Build run command with parameters
-        param_flags = []
-        if st.session_state.log2fc != 1.0:
-            param_flags.append(f"--log2fc {st.session_state.log2fc}")
-        if st.session_state.fdr != 0.05:
-            param_flags.append(f"--fdr {st.session_state.fdr}")
-        if st.session_state.min_counts != 10:
-            param_flags.append(f"--min-counts {st.session_state.min_counts}")
-        if st.session_state.k_value != 100:
-            param_flags.append(f"--k {st.session_state.k_value}")
-
-        param_str = " \\\n  ".join(param_flags)
-        if param_str:
-            run_cmd = f"autoretroab run \\\n  --config jobs/{job_name}/config.yaml \\\n  --cores 4 \\\n  {param_str}"
-        else:
-            run_cmd = f"autoretroab run \\\n  --config jobs/{job_name}/config.yaml \\\n  --cores 4"
+        run_cmd = f"autoretroab run \\\n  --config jobs/{job_name}/config.yaml \\\n  --cores 4"
 
         st.markdown("**Step 4a — Create your job:**")
         st.code("\n".join(cmd_parts), language="bash")
@@ -389,14 +250,6 @@ group1: {group1}
 group2: {group2}
 analysis_type: {analysis_type}
 samples_csv: samples.csv
-
-# Parameters
-log2fc_threshold: {st.session_state.log2fc}
-fdr_threshold: {st.session_state.fdr}
-min_counts: {st.session_state.min_counts}
-bowtie2_k: {st.session_state.k_value}
-proximity_window_bp: {st.session_state.proximity_window}
-top_hits: {st.session_state.top_hits}
 """
         col_dl1, col_dl2 = st.columns(2)
         with col_dl1:
@@ -493,9 +346,9 @@ with tab2:
     """)
 
 # ════════════════════════════════════════════════════════════════════════════
-# TAB 4 — EXAMPLE RESULTS
+# TAB 3 — EXAMPLE RESULTS
 # ════════════════════════════════════════════════════════════════════════════
-with tab4:
+with tab3:
     st.markdown("## 📊 Example Results")
     st.markdown("Results from the four cancer datasets analysed in this thesis using AutoRetroAb.")
 

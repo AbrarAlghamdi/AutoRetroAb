@@ -9,8 +9,7 @@ ARG MAMBA_DOCKERFILE_ACTIVATE=1
 
 WORKDIR /opt/autoretroab
 COPY . /opt/autoretroab
-RUN pip install --no-cache-dir .
-
+RUN pip install --no-cache-dir -e .
 WORKDIR /data
 
 ENTRYPOINT ["/usr/local/bin/_entrypoint.sh", "autoretroab"]

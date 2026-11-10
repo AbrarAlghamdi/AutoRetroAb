@@ -19,17 +19,27 @@ def find_fastq_files(rawdir: str, run_id: str):
     paired_2_flat = os.path.join(rawdir, f"{run_id}_2.fastq.gz")
     single_flat = os.path.join(rawdir, f"{run_id}.fastq.gz")
 
+    # Paired-end: both mates present (checked first, takes priority)
     if os.path.exists(paired_1_sub) and os.path.exists(paired_2_sub):
         return ("paired", paired_1_sub, paired_2_sub)
-
-    if os.path.exists(single_sub):
-        return ("single", single_sub)
 
     if os.path.exists(paired_1_flat) and os.path.exists(paired_2_flat):
         return ("paired", paired_1_flat, paired_2_flat)
 
+    # Single-end: plain filename with no mate suffix
+    if os.path.exists(single_sub):
+        return ("single", single_sub)
+
     if os.path.exists(single_flat):
         return ("single", single_flat)
+
+    # Single-end written with a _1 suffix by fasterq-dump --split-files
+    # (mate 2 absent -> treat the _1 file as single-end)
+    if os.path.exists(paired_1_sub) and not os.path.exists(paired_2_sub):
+        return ("single", paired_1_sub)
+
+    if os.path.exists(paired_1_flat) and not os.path.exists(paired_2_flat):
+        return ("single", paired_1_flat)
 
     return None
 

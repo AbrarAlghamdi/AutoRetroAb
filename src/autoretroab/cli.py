@@ -1,4 +1,3 @@
-
 import argparse
 import csv
 import json
@@ -8,6 +7,8 @@ import subprocess
 import sys
 import urllib.request
 import gzip
+
+from autoretroab import __version__
 
 
 GENCODE_PRIMARY_FASTA_URL = (
@@ -27,7 +28,8 @@ def run_command(cmd):
         sys.exit(result.returncode)
 
 
-def run_pipeline(config: str, cores: str, rerun_incomplete: bool = False):
+def run_pipeline(config: str, cores=None, rerun_incomplete: bool = False,
+                 profile=None, dry_run: bool = False):
     project_root = get_project_root()
     snakefile = os.path.join(project_root, "workflow", "Snakefile")
 
@@ -35,12 +37,23 @@ def run_pipeline(config: str, cores: str, rerun_incomplete: bool = False):
         "snakemake",
         "-s", snakefile,
         "--configfile", config,
-        "--cores", str(cores),
         "-p",
     ]
 
+    if profile:
+        # e.g. profiles/slurm: submits each rule as a SLURM job
+        cmd += ["--profile", profile]
+        if cores is not None:
+            cmd += ["--cores", str(cores)]
+    else:
+        cmd += ["--cores", str(cores if cores is not None else 4)]
+
     if rerun_incomplete:
         cmd.append("--rerun-incomplete")
+    if dry_run:
+        cmd.append("--dry-run")
+
+    print("Running:", " ".join(cmd))
 
     result = subprocess.run(cmd)
     sys.exit(result.returncode)
@@ -67,23 +80,86 @@ def parse_sample_entries(sample_entries):
 
 
 def load_samples_from_csv(csv_path):
+    """Read samples from CSV.
+
+    Required columns: sample_id, condition, and either run_id (SRA accession)
+    or r1 (local FASTQ; add r2 for paired-end). Each row must provide a
+    run_id or an r1 path.
+    """
     rows = []
     with open(csv_path, newline="") as f:
         reader = csv.DictReader(f)
-        required = {"sample_id", "condition", "run_id"}
-        if not required.issubset(reader.fieldnames or []):
+        fields = set(reader.fieldnames or [])
+        if not {"sample_id", "condition"}.issubset(fields) or not (
+            "run_id" in fields or "r1" in fields
+        ):
             raise ValueError(
-                f"CSV must contain columns: {', '.join(sorted(required))}"
+                "CSV must contain columns: sample_id, condition, and run_id "
+                "and/or r1 (plus r2 for paired-end local FASTQ)"
             )
-        for row in reader:
-            rows.append(
-                {
-                    "sample_id": row["sample_id"].strip(),
-                    "condition": row["condition"].strip(),
-                    "run_id": row["run_id"].strip(),
-                }
-            )
+        for line_no, row in enumerate(reader, start=2):
+            entry = {
+                "sample_id": (row.get("sample_id") or "").strip(),
+                "condition": (row.get("condition") or "").strip(),
+                "run_id": (row.get("run_id") or "").strip(),
+                "r1": (row.get("r1") or "").strip(),
+                "r2": (row.get("r2") or "").strip(),
+            }
+            if not entry["sample_id"] or not entry["condition"]:
+                raise ValueError(f"Line {line_no}: sample_id and condition are required")
+            if not entry["run_id"] and not entry["r1"]:
+                raise ValueError(
+                    f"Line {line_no} ({entry['sample_id']}): provide run_id or r1"
+                )
+            if entry["r2"] and not entry["r1"]:
+                raise ValueError(
+                    f"Line {line_no} ({entry['sample_id']}): r2 given without r1"
+                )
+            rows.append(entry)
     return rows
+
+
+def link_local_fastqs(rows, raw_dir):
+    """Symlink local FASTQ files into raw_dir using the names the pipeline
+    expects (<id>_1/_2.fastq.gz or <id>.fastq.gz) and set run_id to sample_id.
+    Returns the list of SRA run IDs that still need downloading."""
+    sra_ids = []
+    for row in rows:
+        r1 = row.get("r1", "")
+        if not r1:
+            sra_ids.append(row["run_id"])
+            continue
+
+        r2 = row.get("r2", "")
+        run_id = row["sample_id"]
+        targets = [(r1, f"{run_id}_1.fastq.gz"), (r2, f"{run_id}_2.fastq.gz")] if r2 \
+            else [(r1, f"{run_id}.fastq.gz")]
+
+        for src, name in targets:
+            src_abs = os.path.abspath(os.path.expanduser(src))
+            if not src_abs.endswith(".gz"):
+                raise ValueError(f"{row['sample_id']}: FASTQ must be gzipped (.gz): {src}")
+            if not os.path.exists(src_abs):
+                raise FileNotFoundError(f"{row['sample_id']}: FASTQ not found: {src_abs}")
+            if os.path.getsize(src_abs) == 0:
+                raise ValueError(f"{row['sample_id']}: FASTQ file is empty: {src_abs}")
+            try:
+                with gzip.open(src_abs, "rb") as _fh:
+                    has_data = bool(_fh.read(1024))
+            except OSError as _e:
+                raise ValueError(
+                    f"{row['sample_id']}: FASTQ is not a valid gzip file "
+                    f"(possibly corrupt or truncated): {src_abs} ({_e})"
+                )
+            if not has_data:
+                raise ValueError(f"{row['sample_id']}: FASTQ contains no reads: {src_abs}")
+            dest = os.path.join(raw_dir, name)
+            if os.path.lexists(dest):
+                os.remove(dest)
+            os.symlink(src_abs, dest)
+
+        row["run_id"] = run_id
+    return sra_ids
 
 
 def ensure_dir(path):
@@ -159,6 +235,10 @@ def write_job_files(job_name: str, group1: str, group2: str, rows):
     os.makedirs(job_dir, exist_ok=True)
     os.makedirs(results_dir, exist_ok=True)
 
+    raw_dir = os.path.join(results_dir, "raw")
+    os.makedirs(raw_dir, exist_ok=True)
+    srr_ids = link_local_fastqs(rows, raw_dir)
+
     samples_path = os.path.join(job_dir, "samples.tsv")
     comparison_path = os.path.join(job_dir, "comparison.tsv")
     input_json_path = os.path.join(job_dir, "input.json")
@@ -173,14 +253,13 @@ def write_job_files(job_name: str, group1: str, group2: str, rows):
         f.write("comparison\tgroup1\tgroup2\n")
         f.write(f"main\t{group1}\t{group2}\n")
 
-    srr_ids = [row["run_id"] for row in rows]
     input_json = {
         "job_id": 1,
         "user_id": 1,
         "job_name": job_name,
         "db_type": "sra",
         "ids": srr_ids,
-        "output_dir": os.path.join(results_dir, "raw"),
+        "output_dir": raw_dir,
         "max_concurrent": 4,
     }
 
@@ -244,11 +323,19 @@ def init_csv(path: str):
 
 def main():
     parser = argparse.ArgumentParser(prog="autoretroab")
+    parser.add_argument(
+        "--version", action="version", version=f"%(prog)s {__version__}"
+    )
     sub = parser.add_subparsers(dest="command")
 
     run = sub.add_parser("run", help="Run the pipeline")
     run.add_argument("--config", required=True)
-    run.add_argument("--cores", default="4")
+    run.add_argument("--cores", default=None,
+                     help="CPU cores (default 4 when running locally)")
+    run.add_argument("--profile", default=None,
+                     help="Snakemake profile directory, e.g. profiles/slurm")
+    run.add_argument("--dry-run", action="store_true",
+                     help="Show the jobs that would run without running them")
     run.add_argument("--rerun-incomplete", action="store_true")
 
     create = sub.add_parser("create-job", help="Create a job directly from --sample entries")
@@ -276,7 +363,8 @@ def main():
     args = parser.parse_args()
 
     if args.command == "run":
-        run_pipeline(args.config, args.cores, args.rerun_incomplete)
+        run_pipeline(args.config, args.cores, args.rerun_incomplete,
+                     args.profile, args.dry_run)
     elif args.command == "create-job":
         create_job(args.name, args.group1, args.group2, args.sample)
     elif args.command == "create-job-from-csv":

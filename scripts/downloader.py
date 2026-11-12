@@ -182,7 +182,7 @@ async def main_async(config):
     max_concurrent = int(config.get("max_concurrent", 4))
 
     if not ids:
-        raise ValueError("No SRR IDs found in input JSON under 'ids'")
+        print("No SRA run IDs to download (local FASTQ input only).")         return
     if not output_dir:
         raise ValueError("No output_dir found in input JSON")
 
